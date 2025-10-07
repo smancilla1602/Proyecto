@@ -1,31 +1,74 @@
 import React, { useState } from 'react';
-import { Text, TextInput, Button, View, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { 
+  Text, 
+  TextInput, 
+  Button, 
+  View, 
+  StyleSheet, 
+  TouchableOpacity,
+  Alert 
+} from 'react-native';
 import axios from 'axios';
+import User from './User';
 
-export default function App() {
+const Stack = createStackNavigator();
+
+// Componente de Login
+function LoginScreen({ navigation }) {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [esRegistro, setEsRegistro] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
+  const [tipoUsuario, setTipoUsuario] = useState('paciente');
 
-  // Función para manejar el login
   const handleLogin = async () => {
     try {
-      // Realizar la solicitud POST al backend
-      const response = await axios.post('http://localhost:3001/api/auth/login', {
+      const response = await axios.post('http://192.168.1.13:3001/api/auth/login', {
         correo,
         contrasena,
       });
 
       console.log('Respuesta del backend:', response.data);
 
-      // Verificar si el login fue exitoso
       if (response.data.success) {
-        window.alert(`Login Exitoso: Bienvenido, ${response.data.user.nombre}`); // Usando window.alert() en la web
+        // Navegar a la pantalla de usuario con los datos
+        navigation.replace('User', { user: response.data.user });
       } else {
-        // Si las credenciales son inválidas
-        window.alert(`Error: ${response.data.message}`); // Usando window.alert() en la web
+        Alert.alert('Error', response.data.message);
       }
     } catch (error) {
-      window.alert('Error: No se pudo conectar con el servidor');
+      Alert.alert('Error', 'No se pudo conectar con el servidor');
+      console.error(error);
+    }
+  };
+
+  const handleRegistro = async () => {
+    try {
+      const response = await axios.post('http://192.168.1.13:3001/api/auth/registro', {
+        nombre,
+        apellido,
+        correo,
+        contrasena,
+        tipo_usuario: tipoUsuario
+      });
+
+      console.log('Respuesta del registro:', response.data);
+
+      if (response.data.success) {
+        Alert.alert('Éxito', `Registro Exitoso: Bienvenido, ${nombre}`);
+        setEsRegistro(false);
+        setNombre('');
+        setApellido('');
+        setCorreo('');
+        setContrasena('');
+      } else {
+        Alert.alert('Error', response.data.message);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo conectar con el servidor');
       console.error(error);
     }
   };
@@ -33,15 +76,39 @@ export default function App() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Iniciar sesión</Text>
-        <Text>Correo</Text>
+        <Text style={styles.title}>
+          {esRegistro ? 'Crear cuenta' : 'Iniciar sesión'}
+        </Text>
+
+        {esRegistro && (
+          <>
+            <Text style={styles.label}>Nombre</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nombre"
+              value={nombre}
+              onChangeText={setNombre}
+            />
+            <Text style={styles.label}>Apellido</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Apellido"
+              value={apellido}
+              onChangeText={setApellido}
+            />
+          </>
+        )}
+
+        <Text style={styles.label}>Correo</Text>
         <TextInput
           style={styles.input}
           placeholder="Correo"
           value={correo}
           onChangeText={setCorreo}
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
-        <Text>Contraseña</Text>
+        <Text style={styles.label}>Contraseña</Text>
         <TextInput
           style={styles.input}
           placeholder="Contraseña"
@@ -49,9 +116,76 @@ export default function App() {
           onChangeText={setContrasena}
           secureTextEntry
         />
-        <Button title="Iniciar sesión" onPress={handleLogin} />
+
+        {esRegistro && (
+          <>
+            <Text style={styles.label}>Tipo de usuario</Text>
+            <View style={styles.radioContainer}>
+              <TouchableOpacity 
+                style={styles.radioButton}
+                onPress={() => setTipoUsuario('paciente')}
+              >
+                <View style={styles.radioCircle}>
+                  {tipoUsuario === 'paciente' && <View style={styles.selectedRb} />}
+                </View>
+                <Text style={styles.radioText}>Paciente</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.radioButton}
+                onPress={() => setTipoUsuario('medico')}
+              >
+                <View style={styles.radioCircle}>
+                  {tipoUsuario === 'medico' && <View style={styles.selectedRb} />}
+                </View>
+                <Text style={styles.radioText}>Médico</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        <View style={styles.buttonContainer}>
+          <Button 
+            title={esRegistro ? "Registrarse" : "Iniciar sesión"} 
+            onPress={esRegistro ? handleRegistro : handleLogin} 
+          />
+        </View>
+
+        <TouchableOpacity 
+          style={styles.switchButton}
+          onPress={() => setEsRegistro(!esRegistro)}
+        >
+          <Text style={styles.switchText}>
+            {esRegistro 
+              ? "¿Ya tienes cuenta? Inicia sesión" 
+              : "¿No tienes cuenta? Regístrate"}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
+  );
+}
+
+// Componente principal con navegación
+function MainApp() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="User" 
+          component={User}
+          options={{ 
+            title: 'Mi Perfil',
+            headerBackTitle: 'Cerrar sesión'
+          }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
@@ -61,9 +195,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f0f0f5',
+    padding: 20,
   },
   card: {
-    width: '40%',
+    width: '100%',
+    maxWidth: 400,
     padding: 20,
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -71,6 +207,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
+    elevation: 3,
     alignItems: 'center',
   },
   title: {
@@ -78,6 +215,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 5,
+    alignSelf: 'flex-start',
+    width: '100%',
   },
   input: {
     height: 50,
@@ -86,8 +232,55 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     marginBottom: 15,
-    padding: 10,
+    paddingHorizontal: 15,
     fontSize: 16,
     backgroundColor: '#fff',
   },
+  radioContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  radioButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+  },
+  radioCircle: {
+    height: 20,
+    width: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  selectedRb: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#007AFF',
+  },
+  radioText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  buttonContainer: {
+    width: '100%',
+    marginVertical: 10,
+  },
+  switchButton: {
+    marginTop: 20,
+    padding: 10,
+  },
+  switchText: {
+    color: '#007AFF',
+    fontSize: 16,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
 });
+
+export default MainApp;
